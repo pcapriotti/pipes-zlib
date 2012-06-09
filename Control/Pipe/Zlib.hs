@@ -14,17 +14,17 @@ import qualified Data.ByteString as B
 import Prelude hiding (catch)
 
 -- | Gzip compression with default parameters.
-gzip :: MonadIO m => Pipe B.ByteString B.ByteString m r
+gzip :: MonadIO m => Pipe l B.ByteString B.ByteString m r
 gzip = compress 1 (WindowBits 31)
 
 -- | Gzip decompression with default parameters.
-gunzip :: MonadIO m => Pipe B.ByteString B.ByteString m r
+gunzip :: MonadIO m => Pipe l B.ByteString B.ByteString m r
 gunzip = decompress (WindowBits 31)
 
 decompress
     :: MonadIO m
     => WindowBits
-    -> Pipe B.ByteString B.ByteString m r
+    -> Pipe l B.ByteString B.ByteString m r
 decompress config = do
     inf <- liftIO $ initInflate config
     let finalize = do chunk <- liftIO $ finishInflate inf
@@ -37,7 +37,7 @@ compress
     :: MonadIO m
     => Int
     -> WindowBits
-    -> Pipe B.ByteString B.ByteString m r
+    -> Pipe l B.ByteString B.ByteString m r
 compress level config = do
     def <- liftIO $ initDeflate level config
     let finalize = yieldPopper (finishDeflate def)
@@ -46,12 +46,12 @@ compress level config = do
       yieldPopper popper
 
 forP' :: Monad m
-      => Pipe a b m r2
-      -> (a -> Pipe a b m r1)
-      -> Pipe a b m r
+      => Pipe l a b m r2
+      -> (a -> Pipe l a b m r1)
+      -> Pipe l a b m r
 forP' p f = forP f >> p >> discard
 
-yieldPopper :: MonadIO m => Popper -> Pipe a B.ByteString m ()
+yieldPopper :: MonadIO m => Popper -> Pipe l a B.ByteString m ()
 yieldPopper pop = do
   x <- liftIO pop
   case x of
