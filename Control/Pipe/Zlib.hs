@@ -27,11 +27,12 @@ decompress
     -> Pipe l B.ByteString B.ByteString m r
 decompress config = do
     inf <- liftIO $ initInflate config
-    let finalize = do chunk <- liftIO $ finishInflate inf
-                      unless (B.null chunk) $ yield chunk
-    forP' finalize $ \x -> do
+    forP $ \x -> do
       popper <- liftIO $ feedInflate inf x
       yieldPopper popper
+    chunk <- liftIO $ finishInflate inf
+    unless (B.null chunk) $ yield chunk
+    discard
 
 compress
     :: MonadIO m
@@ -40,16 +41,11 @@ compress
     -> Pipe l B.ByteString B.ByteString m r
 compress level config = do
     def <- liftIO $ initDeflate level config
-    let finalize = yieldPopper (finishDeflate def)
-    forP' finalize $ \x -> do
+    forP $ \x -> do
       popper <- liftIO $ feedDeflate def x
       yieldPopper popper
-
-forP' :: Monad m
-      => Pipe l a b m r2
-      -> (a -> Pipe l a b m r1)
-      -> Pipe l a b m r
-forP' p f = forP f >> p >> discard
+    yieldPopper (finishDeflate def)
+    discard
 
 yieldPopper :: MonadIO m => Popper -> Pipe l a B.ByteString m ()
 yieldPopper pop = do
